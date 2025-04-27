@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "393366255668",
+    "project_id": "survy-1f666",
+    "storage_bucket": "survy-1f666.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:393366255668:android:b85c3a7bd2ab1eddccb261",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9LKwBGkDO1yKmCn2pn64eozKBK720lrA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
