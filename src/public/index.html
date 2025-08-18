@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Qualtrics Client Portal</title>
+  <style>
+    body {
+      background: linear-gradient(135deg, hwb(253 0% 0%) 0%, #eaf0f6 100%);
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .main-wrapper {
+      display: flex;
+      align-items: flex-start;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1600px;
+      justify-content: center;
+    }
+    .container {
+    background: #2085e400;
+    border-radius: 20px;
+    box-shadow: 0 10px 50px 0 rgb(13 27 195);
+    padding: 2rem 2.5rem;
+    width: 370px;
+    max-width: 90vw;
+    text-align: center;
+    }
+    h2 {
+      color: #fafafa;
+      margin-bottom: 1rem;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 1.5rem;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(255, 204, 51, 0.07);
+    }
+    .tab {
+      flex: 1;
+      padding: 0.75rem 0;
+      background: linear-gradient(90deg, #4051b5 0%, #6c7ae0 100%);
+      color: #000000;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s, color 0.2s;
+      border: none;
+      outline: none;
+    }
+    .tab.active {
+      background: linear-gradient(90deg, #4051b5 0%, #6c7ae0 100%);
+      color: #fff;
+    }
+    form {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    form.active {
+      display: flex;
+    }
+    input[type="text"], input[type="password"], input[type="email"] {
+      padding: 0.7rem;
+      border-radius: 6px;
+      border: 1px solid #4051b5;
+      font-size: 1rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focus {
+      border: 1.5px solid #4051b5;
+    }
+    button, .show-help-btn {
+      background: linear-gradient(90deg, #4051b5 0%, #6c7ae0 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.8rem;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover, .show-help-btn:hover {
+      background: linear-gradient(90deg, #6c7ae0 0%, #4051b5 100%);
+      color: #fff;
+    }
+    .message {
+      margin-top: 1rem;
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    .hidden {
+      display: none !important;
+    }
+    /* Images container styles */
+    .images-container {
+      background: #fffbe7;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px 0 rgba(255, 204, 51, 0.15);
+      padding: 1.5rem;
+      max-width: 1350px;
+      min-width: 350px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+    .images-container img {
+      width: 100%;
+      max-width: 1300px;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+    }
+    .show-help-btn {
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+      width: 100%;
+      background: #ff9800;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.7rem;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .show-help-btn:hover {
+      background: #ffb347;
+      color: #fff;
+    }
+    @media (max-width: 1100px) {
+      .main-wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+      .images-container {
+        max-width: 98vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-wrapper">
+    <div class="container">
+      <h2>Qualtrics Client Portal</h2>
+      <div class="tabs">
+        <button class="tab active" onclick="showTab('signup')">Client Sign Up</button>
+        <button class="tab" onclick="showTab('login')">Client Login</button>
+      </div>
+      <form id="signupForm" class="active" onsubmit="return handleClientSignup(event)">
+        <input type="email" id="signupEmail" placeholder="Email" required>
+        <input type="password" id="signupPassword" placeholder="Password" required>
+        <button type="submit">Sign Up</button>
+        <div class="message" id="signupMsg"></div>
+      </form>
+      <form id="loginForm" onsubmit="return handleClientLogin(event)">
+        <input type="email" id="loginEmail" placeholder="Email" required>
+        <input type="password" id="loginPassword" placeholder="Password" required>
+        <button type="submit">Sign In</button>
+        <div class="message" id="loginMsg"></div>
+      </form>
+      <form id="qualtricsForm" class="hidden" onsubmit="return handleQualtricsUpdate(event)">
+        <input type="text" id="qualtricsApiKey" placeholder="Qualtrics API Key" required>
+        <input type="text" id="qualtricsDatacenter" placeholder="Qualtrics Datacenter" required>
+        <input type="text" id="directoryId" placeholder="Directory ID" required>
+        <button type="submit">Update Qualtrics Info</button>
+        <div class="message" id="qualtricsMsg"></div>
+      </form>
+      <button id="showHelpBtn" class="show-help-btn hidden" type="button" onclick="toggleHelp()">Show Help</button>
+    </div>
+    <div id="helpSection" class="images-container hidden">
+      <h3>How to find your Qualtrics Data</h3>
+      <div>
+        <img src="image1.png" alt="Step 1">
+        <div style="text-align:center;">Step 1: Go to your Qualtrics account settings.</div>
+      </div>
+      <div>
+        <img src="image2.png" alt="Step 2">
+        <div style="text-align:center;">Step 2: Switch to the older version.</div>
+      </div>
+      <div>
+        <img src="image3.png" alt="Step 3">
+        <div style="text-align:center;">Step 3: Move to the Qualtrics IDs tab.</div>
+      </div>
+      <div>
+        <img src="image4.png" alt="Step 4">
+        <div style="text-align:center;">
+          <div>Step 4:</div>
+          <div>1) Directory ID</div>
+          <div>2) Datacenter ID</div>
+          <div>3) Press to generate API key if not generated</div>
+          <div>4) API key</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    let currentClientId = null;
+    let helpVisible = false;
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('form').forEach(f => f.classList.remove('active'));
+      document.getElementById('qualtricsForm').classList.add('hidden');
+      document.getElementById('showHelpBtn').classList.add('hidden');
+      document.getElementById('helpSection').classList.add('hidden');
+      helpVisible = false;
+      if (tab === 'signup') {
+        document.querySelector('.tab:nth-child(1)').classList.add('active');
+        document.getElementById('signupForm').classList.add('active');
+      } else {
+        document.querySelector('.tab:nth-child(2)').classList.add('active');
+        document.getElementById('loginForm').classList.add('active');
+      }
+    }
+
+    async function handleClientSignup(e) {
+      e.preventDefault();
+      const email = document.getElementById('signupEmail').value;
+      const password = document.getElementById('signupPassword').value;
+      const msg = document.getElementById('signupMsg');
+      msg.textContent = '';
+      try {
+        const res = await fetch('/api/clients/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        msg.style.color = res.ok ? '#27ae60' : '#e74c3c';
+        msg.textContent = data.message || (res.ok ? 'Sign up successful!' : 'Sign up failed.');
+        if (res.ok && data.client && data.client.id) {
+          currentClientId = data.client.id;
+          setTimeout(() => {
+            showTab('login');
+            msg.textContent = '';
+          }, 1000);
+        }
+      } catch (err) {
+        msg.style.color = '#e74c3c';
+        msg.textContent = 'Error signing up.';
+      }
+      return false;
+    }
+
+    async function handleClientLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      const msg = document.getElementById('loginMsg');
+      msg.textContent = '';
+      try {
+        const res = await fetch('/api/clients/signin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        msg.style.color = res.ok ? '#27ae60' : '#e74c3c';
+        msg.textContent = data.message || (res.ok ? 'Sign in successful!' : 'Sign in failed.');
+        if (res.ok && data.client && data.client.id) {
+          currentClientId = data.client.id;
+          document.getElementById('loginForm').classList.remove('active');
+          document.getElementById('qualtricsForm').classList.remove('hidden');
+          document.getElementById('qualtricsForm').classList.add('active');
+          document.getElementById('showHelpBtn').classList.remove('hidden');
+        }
+      } catch (err) {
+        msg.style.color = '#e74c3c';
+        msg.textContent = 'Error signing in.';
+      }
+      return false;
+    }
+
+    async function handleQualtricsUpdate(e) {
+      e.preventDefault();
+      const qualtricsApiKey = document.getElementById('qualtricsApiKey').value;
+      const qualtricsDatacenter = document.getElementById('qualtricsDatacenter').value;
+      const directoryId = document.getElementById('directoryId').value;
+      const msg = document.getElementById('qualtricsMsg');
+      msg.textContent = '';
+      if (!currentClientId) {
+        msg.style.color = '#e74c3c';
+        msg.textContent = 'Client not authenticated.';
+        return false;
+      }
+      try {
+        const res = await fetch(`/api/clients/${currentClientId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qualtricsApiKey, qualtricsDatacenter, directoryId })
+        });
+        const data = await res.json();
+        msg.style.color = res.ok ? '#27ae60' : '#e74c3c';
+        msg.textContent = res.ok ? 'Qualtrics info updated!' : (data.message || 'Update failed.');
+      } catch (err) {
+        msg.style.color = '#e74c3c';
+        msg.textContent = 'Error updating Qualtrics info.';
+      }
+      return false;
+    }
+
+    function toggleHelp() {
+      helpVisible = !helpVisible;
+      document.getElementById('helpSection').classList.toggle('hidden', !helpVisible);
+      document.getElementById('showHelpBtn').textContent = helpVisible ? 'Hide Help' : 'Show Help';
+    }
+  </script>
+</body>
+</html>
