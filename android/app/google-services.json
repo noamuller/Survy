@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "393366255668",
-    "project_id": "survy-1f666",
-    "storage_bucket": "survy-1f666.firebasestorage.app"
+    "project_number": "285594128317",
+    "project_id": "qualtrics-messaging-server",
+    "storage_bucket": "qualtrics-messaging-server.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:393366255668:android:b85c3a7bd2ab1eddccb261",
+        "mobilesdk_app_id": "1:285594128317:android:9b6a284f0afcfc6bb6ccd4",
         "android_client_info": {
           "package_name": "com.example.flutter_application_1"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyD9LKwBGkDO1yKmCn2pn64eozKBK720lrA"
+          "current_key": "AIzaSyAiyNRBMEEoSTRxjuEzT83XYtbVz0DxnF0"
         }
       ],
       "services": {

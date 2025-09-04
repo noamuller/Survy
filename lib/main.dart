@@ -6,7 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'firebase_options.dart'; // created by `flutterfire configure`
+import 'firebase_options.dart'; 
+import 'dart:convert';
 
 // ====== OPTIONAL: set your server endpoint here ======
 const String kServerRegisterUrl = 'https://api-go537uh5jq-uc.a.run.app/api/users/signup';
@@ -14,12 +15,15 @@ const String kServerRegisterUrl = 'https://api-go537uh5jq-uc.a.run.app/api/users
 // Top-level background handler (Android/iOS).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   // Do minimal background work if needed (e.g., logging).
   await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-  alert: true,
-  badge: true,
-  sound: true);
+    alert: true,
+    badge: true,
+    sound: true,
+  );
 }
 
 Future<void> main() async {
@@ -51,6 +55,34 @@ class SignUpPage extends StatefulWidget {
   @override
   State<SignUpPage> createState() => _SignUpPageState();
 }
+class RegistrationSuccessPage extends StatelessWidget {
+  const RegistrationSuccessPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      //appBar: AppBar(title: const Text('Registration')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.check_circle, color: Colors.green, size: 64),
+            SizedBox(height: 24),
+            Text(
+              'Register successful!',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'You can close the app.',
+              style: TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SignUpPageState extends State<SignUpPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -81,11 +113,11 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> _initLoad() async {
     // Prefill saved values
-    final prefs = await SharedPreferences.getInstance();
-    _nameCtrl.text = prefs.getString(_kNameKey) ?? '';
-    _emailCtrl.text = prefs.getString(_kEmailKey) ?? '';
-    final savedToken = prefs.getString(_kFcmTokenKey) ?? '';
-    setState(() => _token = savedToken);
+    //final prefs = await SharedPreferences.getInstance();
+    //_nameCtrl.text = prefs.getString(_kNameKey) ?? '';
+    //_emailCtrl.text = prefs.getString(_kEmailKey) ?? '';
+   // final savedToken = prefs.getString(_kFcmTokenKey) ?? '';
+    //setState(() => _token = savedToken);
 
     // Foreground handlers (optional)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -114,12 +146,23 @@ class _SignUpPageState extends State<SignUpPage> {
     return null;
   }
 
-  String? _validateGmail(String? value) {
+  String? _validateEmail(String? value) {
     final v = (value ?? '').trim().toLowerCase();
-    if (v.isEmpty) return 'Please enter your Gmail';
+    if (v.isEmpty) return 'Please enter your email';
     final emailOk = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v);
     if (!emailOk) return 'Please enter a valid email address';
-    if (!v.endsWith('@gmail.com')) return 'Please use a Gmail address (@gmail.com)';
+
+    // Only allow specific domains
+    final allowedDomains = [
+      'gmail.com',
+      'yahoo.com',
+      'hotmail.com',
+      'mta.ac.il',
+    ];
+    final domain = v.split('@').last;
+    if (!allowedDomains.contains(domain)) {
+      return 'Only Gmail, Yahoo, Hotmail, or mta.ac.il emails are allowed';
+    }
     return null;
   }
 
@@ -189,17 +232,19 @@ class _SignUpPageState extends State<SignUpPage> {
     final resp = await http.post(
       Uri.parse(kServerRegisterUrl),
       headers: {'Content-Type': 'application/json'},
-      body: '''
-        {
-          "name": "$name",
-          "email": "$email",
-          "token": "$_token",
-          "platform": "${Platform.operatingSystem}"
-        }
-      ''',
+      body: jsonEncode({
+        "username": name,
+        "email": email,
+        "fcmToken": _token,
+      }),
     );
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      _showSnack('Registered with server.');
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const RegistrationSuccessPage()),
+      );
     } else {
       _showSnack('Server error: ${resp.statusCode} ${resp.reasonPhrase}');
     }
@@ -228,13 +273,13 @@ class _SignUpPageState extends State<SignUpPage> {
 
     if (_initializing) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Qualtrics Portal')),
+        //appBar: AppBar(title: const Text('Qualtrics Portal')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Qualtrics Portal')),
+      //appBar: AppBar(title: const Text('Qualtrics Portal')),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -272,7 +317,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Enter your name and Gmail registered for Qualtrics.\nAllow notifications to get your device token.',
+                        'Enter your name and Email registered for Qualtrics.\nAllow notifications to get your device token.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
@@ -284,7 +329,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'Name',
-                          hintText: 'e.g., Noa Muller',
+                          hintText: 'yourname',
                           filled: true,
                         ),
                         validator: _validateName,
@@ -295,12 +340,13 @@ class _SignUpPageState extends State<SignUpPage> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.done,
                         decoration: const InputDecoration(
-                          labelText: 'Gmail',
-                          hintText: 'yourname@gmail.com',
+                          labelText: 'Email',
+                          hintText: 'yourname@email.com',
                           filled: true,
                         ),
-                        validator: _validateGmail,
+                        validator: _validateEmail, // <-- use new validator
                       ),
+
                       const SizedBox(height: 20),
                       // Get Token / Permission
                       SizedBox(
@@ -318,40 +364,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // Show token (if exists) with Copy
-                      if (_token.isNotEmpty) ...[
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Your FCM token:',
-                            style: theme.textTheme.labelLarge,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: theme.colorScheme.outlineVariant,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: SelectableText(
-                            _token,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: _copyToken,
-                            icon: const Icon(Icons.copy),
-                            label: const Text('Copy token'),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 8),
                       // Submit to server (optional)
                       SizedBox(

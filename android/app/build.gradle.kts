@@ -9,7 +9,8 @@ plugins {
 android {
     namespace = "com.example.flutter_application_1"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+
+    ndkVersion = "27.0.12077973" // <-- Correct place
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -21,7 +22,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.flutter_application_1"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
@@ -31,8 +31,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -53,10 +50,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD9LKwBGkDO1yKmCn2pn64eozKBK720lrA',
-    appId: '1:393366255668:android:b85c3a7bd2ab1eddccb261',
-    messagingSenderId: '393366255668',
-    projectId: 'survy-1f666',
-    storageBucket: 'survy-1f666.firebasestorage.app',
+    apiKey: 'AIzaSyAiyNRBMEEoSTRxjuEzT83XYtbVz0DxnF0',
+    appId: '1:285594128317:android:9b6a284f0afcfc6bb6ccd4',
+    messagingSenderId: '285594128317',
+    projectId: 'qualtrics-messaging-server',
+    storageBucket: 'qualtrics-messaging-server.firebasestorage.app',
   );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCBWWNVU0DqZt_yfZSjzVJG2hopbp_zvXw',
+    appId: '1:285594128317:ios:2c3c2a8a7a5e55a5b6ccd4',
+    messagingSenderId: '285594128317',
+    projectId: 'qualtrics-messaging-server',
+    storageBucket: 'qualtrics-messaging-server.firebasestorage.app',
+    iosBundleId: 'com.example.flutterApplication1',
+  );
+
 }

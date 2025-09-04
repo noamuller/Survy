@@ -5,9 +5,13 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="flutter_application_1"
+        android:label="Survy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="default_channel" />
 
         <activity
             android:name=".MainActivity"
@@ -32,6 +36,9 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="default_channel" />
     </application>
 
     <!-- queries is also a direct child of <manifest>, this is fine -->
