@@ -1,4 +1,4 @@
-const db = require('../services/firebaseAdmin..js');
+const { db } = require('../services/firebaseAdmin..js');
 const bcrypt = require('bcrypt');
 const USERS_COLLECTION = 'users';
 
@@ -63,6 +63,15 @@ class UserController {
       res.status(200).json(updatedUser);
     } catch (error) {
       res.status(500).json({ message: 'Error updating user Qualtrics info', error });
+    }
+  }
+  async deleteUser(req, res) {
+    try {
+      const userId = req.params.id;
+      await db.collection(USERS_COLLECTION).doc(userId).delete();
+      res.status(200).json({ message: 'User deleted successfully.' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error deleting user', error });
     }
   }
 }

@@ -1,4 +1,4 @@
-const db = require('../services/firebaseAdmin..js');
+const { db } = require('../services/firebaseAdmin..js');
 const FCMService = require('../services/fcmService');
 
 class NotificationController {

@@ -1,4 +1,4 @@
-const db = require('../services/firebaseAdmin..js');
+const { db } = require('../services/firebaseAdmin..js');
 const bcrypt = require('bcrypt');
 
 class ClientController {

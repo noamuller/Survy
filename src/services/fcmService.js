@@ -1,4 +1,5 @@
-const admin = require('./firebaseAdmin..js');
+const { admin } = require('./firebaseAdmin..js');
+const { getMessaging } = require('firebase-admin/messaging');
 
 class FCMService {
   static sendPushNotification(token, title, body) {
@@ -6,7 +7,8 @@ class FCMService {
       notification: { title, body },
       token,
     };
-    return admin.messaging().send(message);
+    // For firebase-admin v10+
+    return getMessaging(admin.app()).send(message);
   }
 }
 

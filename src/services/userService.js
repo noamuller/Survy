@@ -1,4 +1,4 @@
-const db = require('./firebaseAdmin..js');
+const { db } = require('./firebaseAdmin..js');
 const USERS_COLLECTION = 'users';
 
 const userService = {

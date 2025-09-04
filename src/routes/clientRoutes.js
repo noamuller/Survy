@@ -1,6 +1,6 @@
 const express = require('express');
 const ClientController = require('../controllers/clientController');
-const db = require('../services/firebaseAdmin..js');
+const { db } = require('../services/firebaseAdmin..js');
 
 const router = express.Router();
 const clientController = new ClientController();

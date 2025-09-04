@@ -1,4 +1,4 @@
-const db = require('../services/firebaseAdmin..js');
+const { db } = require('../services/firebaseAdmin..js');
 const USERS_COLLECTION = 'users';
 
 class AuthController {
