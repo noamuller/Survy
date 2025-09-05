@@ -25,6 +25,25 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     sound: true,
   );
 }
+String? validateEmail(String? value) {
+  final v = (value ?? '').trim().toLowerCase();
+  if (v.isEmpty) return 'Please enter your email';
+  final emailOk = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v);
+  if (!emailOk) return 'Please enter a valid email address';
+
+  // Only allow specific domains
+  final allowedDomains = [
+    'gmail.com',
+    'yahoo.com',
+    'hotmail.com',
+    'mta.ac.il',
+  ];
+  final domain = v.split('@').last;
+  if (!allowedDomains.contains(domain)) {
+    return 'Only Gmail, Yahoo, Hotmail, or mta.ac.il emails are allowed';
+  }
+  return null;
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,8 +52,30 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isRegistered = false;
+  String _username = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRegistration();
+  }
+
+  Future<void> _checkRegistration() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isRegistered = prefs.getBool('isRegistered') ?? false;
+      _username = prefs.getString('name') ?? '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -42,26 +83,39 @@ class MyApp extends StatelessWidget {
       title: 'Qualtrics Portal',
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.deepPurple,
+        colorSchemeSeed: Colors.blue, // Change to blue
         brightness: Brightness.light,
       ),
-      home: const SignUpPage(),
+      home: _isRegistered
+          ? SecondPage(username: _username)
+          : SignUpPage(onRegistered: _checkRegistration),
     );
   }
 }
 
 class SignUpPage extends StatefulWidget {
-  const SignUpPage({super.key});
+  final VoidCallback? onRegistered; // <-- Add this line
+
+  const SignUpPage({super.key, this.onRegistered}); // <-- Update constructor
+
   @override
   State<SignUpPage> createState() => _SignUpPageState();
 }
 class RegistrationSuccessPage extends StatelessWidget {
-  const RegistrationSuccessPage({super.key});
+  final String username;
+  const RegistrationSuccessPage({super.key, required this.username});
 
   @override
   Widget build(BuildContext context) {
+    // Navigate to SecondPage after 1 second
+    Future.delayed(const Duration(seconds: 1), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => SecondPage(username: username)),
+      );
+    });
+
     return Scaffold(
-      //appBar: AppBar(title: const Text('Registration')),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -146,25 +200,6 @@ class _SignUpPageState extends State<SignUpPage> {
     return null;
   }
 
-  String? _validateEmail(String? value) {
-    final v = (value ?? '').trim().toLowerCase();
-    if (v.isEmpty) return 'Please enter your email';
-    final emailOk = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v);
-    if (!emailOk) return 'Please enter a valid email address';
-
-    // Only allow specific domains
-    final allowedDomains = [
-      'gmail.com',
-      'yahoo.com',
-      'hotmail.com',
-      'mta.ac.il',
-    ];
-    final domain = v.split('@').last;
-    if (!allowedDomains.contains(domain)) {
-      return 'Only Gmail, Yahoo, Hotmail, or mta.ac.il emails are allowed';
-    }
-    return null;
-  }
 
   Future<void> _saveBasics(String name, String email) async {
     final prefs = await SharedPreferences.getInstance();
@@ -187,23 +222,23 @@ class _SignUpPageState extends State<SignUpPage> {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
-        _showSnack('Notifications permission denied.');
+        //_showSnack('Notifications permission denied.');
         return;
       }
 
       // 2) Get FCM token (APNs token must exist on iOS real device)
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null || token.isEmpty) {
-        _showSnack('Could not obtain FCM token. Try again.');
+        //_showSnack('Could not obtain FCM token. Try again.');
         return;
       }
 
       await _saveToken(token);
       if (!mounted) return;
       setState(() => _token = token);
-      _showSnack('FCM token retrieved.');
+      //_showSnack('FCM token retrieved.');
     } catch (e) {
-      _showSnack('Error getting token: $e');
+      //_showSnack('Error getting token: $e');
     }
   }
 
@@ -217,49 +252,56 @@ class _SignUpPageState extends State<SignUpPage> {
 
   await _saveBasics(name, email);
 
-  if (_token.isEmpty) {
-    _showSnack('Please enable notifications and get your token first.');
-    return;
-  }
-
-  if (kServerRegisterUrl.isEmpty) {
-    _showSnack('Saved locally. Set kServerRegisterUrl to POST to your server.');
-    return;
-  }
-
   try {
-    _showSnack('Submitting to server...');
+    //_showSnack('Submitting to server...');
+    logToFile('POST https://api-go537uh5jq-uc.a.run.app/api/users');
+    logToFile('Body: ${jsonEncode({
+      "username": name,
+      "fcmToken": _token,
+      "emails": [email],
+    })}');
     final resp = await http.post(
-      Uri.parse(kServerRegisterUrl),
+      Uri.parse('https://api-go537uh5jq-uc.a.run.app/api/users'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         "username": name,
-        "email": email,
         "fcmToken": _token,
+        "emails": [email],
       }),
     );
-
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+    logToFile('Response: ${resp.statusCode} ${resp.body}');
+    if (resp.statusCode == 201) {
+      final data = jsonDecode(resp.body);
+      final userId = data['user']?['id'];
+      if (userId == null) {
+        logToFile('Registration failed: No user ID in response: ${resp.body}');
+        return;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_id', userId);
+      await prefs.setBool('isRegistered', true);
+      if (widget.onRegistered != null) widget.onRegistered!();
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const RegistrationSuccessPage()),
+        MaterialPageRoute(builder: (_) => RegistrationSuccessPage(username: name)),
       );
     } else {
-      _showSnack('Server error: ${resp.statusCode} ${resp.reasonPhrase}');
+      //_showSnack('Server error: ${resp.statusCode} ${resp.reasonPhrase}');
     }
   } catch (e) {
-    _showSnack('Network error: $e');
+    logToFile('Registration error: $e');
+    //_showSnack('Network error: $e');
   }
 }
 
   void _copyToken() {
     if (_token.isEmpty) {
-      _showSnack('No token yet.');
+      //_showSnack('No token yet.');
       return;
     }
     Clipboard.setData(ClipboardData(text: _token));
-    _showSnack('Token copied to clipboard.');
+    //_showSnack('Token copied to clipboard.');
   }
 
   void _showSnack(String msg) {
@@ -283,7 +325,11 @@ class _SignUpPageState extends State<SignUpPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA), Color(0xFFAB47BC)],
+            colors: [
+              Color(0xFF1976D2), // Blue 700
+              Color(0xFF42A5F5), // Blue 400
+              Color(0xFF90CAF9), // Blue 200
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -317,7 +363,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Enter your name and Email registered for Qualtrics.\nAllow notifications to get your device token.',
+                        'Enter your name and Email registered for Qualtrics.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
@@ -344,7 +390,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           hintText: 'yourname@email.com',
                           filled: true,
                         ),
-                        validator: _validateEmail, // <-- use new validator
+                        validator: validateEmail, // <-- use new validator
                       ),
 
                       const SizedBox(height: 20),
@@ -381,13 +427,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'Name, Gmail, and token are saved locally on this device.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -398,4 +437,392 @@ class _SignUpPageState extends State<SignUpPage> {
       ),
     );
   }
+}
+
+class SecondPage extends StatelessWidget {
+  final String username;
+  const SecondPage({super.key, required this.username});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Home'),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const UserSettingsPage()),
+              );
+            },
+            icon: const Icon(Icons.settings, color: Colors.blue), // <-- Change to blue
+            label: const Text('User Settings', style: TextStyle(color: Colors.blue)), // <-- Change to blue
+          ),
+        ],
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            child: Text(username.isNotEmpty ? username[0].toUpperCase() : '?'),
+          ),
+        ),
+      ),
+      body: const Center(child: Text('No available surveys currently')),
+    );
+  }
+}
+class UserSettingsPage extends StatefulWidget {
+  const UserSettingsPage({super.key});
+
+  @override
+  State<UserSettingsPage> createState() => _UserSettingsPageState();
+}
+
+class _UserSettingsPageState extends State<UserSettingsPage> {
+  String? _username;
+  String? _email;
+  List<String> _additionalEmails = [];
+  bool _showEmailsSection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _username = prefs.getString('name') ?? '';
+      _email = prefs.getString('email') ?? '';
+      _additionalEmails = prefs.getStringList('additional_emails') ?? [];
+    });
+  }
+
+  Future<void> _saveAdditionalEmails() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('additional_emails', _additionalEmails);
+  }
+
+  Future<void> _deleteAccount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+    if (userId == null) return;
+    try {
+      logToFile('DELETE https://api-go537uh5jq-uc.a.run.app/api/users/$userId');
+      final resp = await http.delete(
+        Uri.parse('https://api-go537uh5jq-uc.a.run.app/api/users/$userId'),
+      );
+      logToFile('Response: ${resp.statusCode} ${resp.body}');
+      if (resp.statusCode == 200) {
+        await prefs.clear();
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => SignUpPage()),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server error: ${resp.body}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete account: $e')),
+      );
+    }
+  }
+
+  Future<void> _changeMailOrUsername() async {
+    final nameCtrl = TextEditingController(text: _username);
+    final emailCtrl = TextEditingController(text: _email);
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Mail/Username'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter name' : null,
+              ),
+              TextFormField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter email' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('name', nameCtrl.text.trim());
+                await prefs.setString('email', emailCtrl.text.trim());
+                setState(() {
+                  _username = nameCtrl.text.trim();
+                  _email = emailCtrl.text.trim();
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addMail() async {
+    setState(() {
+      _showEmailsSection = !_showEmailsSection;
+    });
+  }
+
+  Future<void> _addNewEmail() async {
+  final emailCtrl = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Add Email'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(labelText: 'Additional Email'),
+                validator: validateEmail,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () async {
+            if (formKey.currentState?.validate() ?? false) {
+              final newEmail = emailCtrl.text.trim();
+              final prefs = await SharedPreferences.getInstance();
+              final userId = prefs.getString('user_id');
+              if (userId == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('User ID not found.')),
+                );
+                return;
+              }
+              try {
+                logToFile('POST https://api-go537uh5jq-uc.a.run.app/api/users/$userId/emails');
+                logToFile('Body: ${jsonEncode({"email": newEmail})}');
+                final resp = await http.post(
+                  Uri.parse('https://api-go537uh5jq-uc.a.run.app/api/users/$userId/emails'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({"email": newEmail}),
+                );
+                logToFile('Response: ${resp.statusCode} ${resp.body}');
+                if (resp.statusCode == 200) {
+                  setState(() {
+                    _additionalEmails.add(newEmail);
+                  });
+                  await _saveAdditionalEmails();
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Server error: ${resp.body}')),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to send to server: $e')),
+                );
+              }
+            }
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
+}
+
+  void _removeMail(int index) async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('user_id');
+  final emailToRemove = _additionalEmails[index];
+  if (userId == null) return;
+  try {
+    logToFile('DELETE https://api-go537uh5jq-uc.a.run.app/api/users/$userId/emails');
+    logToFile('Body: ${jsonEncode({"email": emailToRemove})}');
+    final resp = await http.delete(
+      Uri.parse('https://api-go537uh5jq-uc.a.run.app/api/users/$userId/emails'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({"email": emailToRemove}),
+    );
+    logToFile('Response: ${resp.statusCode} ${resp.body}');
+    if (resp.statusCode == 200) {
+      setState(() {
+        _additionalEmails.removeAt(index);
+      });
+      await _saveAdditionalEmails();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Server error: ${resp.body}')),
+      );
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to remove email: $e')),
+    );
+  }
+}
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('User Settings')),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CircleAvatar(
+              radius: 40,
+              child: Text(
+                (_username?.isNotEmpty ?? false) ? _username![0].toUpperCase() : '?',
+                style: const TextStyle(fontSize: 32),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Text(
+                _username ?? '',
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
+            Center(
+              child: Text(
+                _email ?? '',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            const SizedBox(height: 32),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.delete, color: Colors.blue),
+              label: const Text('Delete Account', style: TextStyle(fontSize: 18, color: Colors.blue)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                side: const BorderSide(color: Colors.blue),
+              ),
+              onPressed: _deleteAccount,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.mail, color: Colors.blue),
+              label: const Text('Add Mail for Account', style: TextStyle(fontSize: 18, color: Colors.blue)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Colors.blue),
+              ),
+              onPressed: () {
+                setState(() {
+                  _showEmailsSection = !_showEmailsSection;
+                });
+              },
+            ),
+            if (_showEmailsSection) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Emails for this account:',
+                style: theme.textTheme.titleMedium,
+              ),
+              // Combine main email and additional emails into one list
+              ...([_email ?? ''] + _additionalEmails).asMap().entries.map((entry) {
+                final idx = entry.key;
+                final email = entry.value;
+                return ListTile(
+                  leading: const Icon(Icons.email, color: Colors.blue),
+                  title: Text(email),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.remove, color: Colors.red),
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      final userId = prefs.getString('user_id');
+                      final emailToRemove = email;
+                      if (userId == null) return;
+                      try {
+                        logToFile('DELETE https://api-go537uh5jq-uc.a.run.app/api/users/$userId/emails');
+                        logToFile('Body: ${jsonEncode({"email": emailToRemove})}');
+                        final resp = await http.delete(
+                          Uri.parse('https://api-go537uh5jq-uc.a.run.app/api/users/$userId/emails'),
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode({"email": emailToRemove}),
+                        );
+                        logToFile('Response: ${resp.statusCode} ${resp.body}');
+                        if (resp.statusCode == 200) {
+                          setState(() {
+                            if (idx == 0) {
+                              _email = '';
+                              prefs.remove('email');
+                            } else {
+                              _additionalEmails.removeAt(idx - 1);
+                              _saveAdditionalEmails();
+                            }
+                          });
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Server error: ${resp.body}')),
+                          );
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to remove email: $e')),
+                        );
+                      }
+                    },
+                  ),
+                );
+              }),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.add, color: Colors.blue),
+                  label: const Text('Add Email', style: TextStyle(color: Colors.blue)),
+                  onPressed: _addNewEmail,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.edit),
+              label: const Text('Change Mail/Username', style: TextStyle(fontSize: 18)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+              ),
+              onPressed: _changeMailOrUsername,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+void logToFile(String message) async {
+  final file = File('api_log.txt'); // This will be in your app's working directory
+  final timestamp = DateTime.now().toIso8601String();
+  await file.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
 }
