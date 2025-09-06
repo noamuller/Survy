@@ -65,11 +65,12 @@ class _MyAppState extends State<MyApp> {
   bool _isRegistered = false;
   String _username = '';
 
-@override
-void initState() {
-  super.initState();
-  logToFile("Test log entry"); 
-}
+  @override
+  void initState() {
+    super.initState();
+    logToFile("Test log entry");
+    _checkRegistration(); 
+  }
 
   Future<void> _checkRegistration() async {
     final prefs = await SharedPreferences.getInstance();
