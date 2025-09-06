@@ -8,6 +8,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart'; 
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+
 
 // ====== OPTIONAL: set your server endpoint here ======
 const String kServerRegisterUrl = 'https://api-go537uh5jq-uc.a.run.app/api/users/signup';
@@ -62,11 +65,11 @@ class _MyAppState extends State<MyApp> {
   bool _isRegistered = false;
   String _username = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _checkRegistration();
-  }
+@override
+void initState() {
+  super.initState();
+  logToFile("Test log entry"); 
+}
 
   Future<void> _checkRegistration() async {
     final prefs = await SharedPreferences.getInstance();
@@ -439,9 +442,54 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 }
 
-class SecondPage extends StatelessWidget {
+class SecondPage extends StatefulWidget {
   final String username;
   const SecondPage({super.key, required this.username});
+
+  @override
+  State<SecondPage> createState() => _SecondPageState();
+}
+
+class _SecondPageState extends State<SecondPage> {
+  List<Survey> _surveys = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSurveys();
+    FirebaseMessaging.onMessage.listen(_handlePush);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handlePush);
+  }
+
+  Future<void> _loadSurveys() async {
+    final surveys = await loadSurveys();
+    setState(() => _surveys = surveys);
+  }
+
+  Future<void> _handlePush(RemoteMessage message) async {
+    final data = message.data;
+    logToFile('Push data received: $data');
+    // Accept both 'url' and 'surveyLink' for compatibility
+    final link = data['url'] ?? data['surveyLink'];
+    if (link != null) {
+      final survey = Survey(
+        link: link,
+        name: data['surveyName'] ?? 'Survey',
+        client: data['clientName'] ?? '',
+      );
+      setState(() {
+        _surveys.add(survey);
+      });
+      await saveSurveys(_surveys);
+    }
+  }
+
+  Future<void> _removeSurvey(int index) async {
+    setState(() {
+      _surveys.removeAt(index);
+    });
+    await saveSurveys(_surveys);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -456,18 +504,50 @@ class SecondPage extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const UserSettingsPage()),
               );
             },
-            icon: const Icon(Icons.settings, color: Colors.blue), // <-- Change to blue
-            label: const Text('User Settings', style: TextStyle(color: Colors.blue)), // <-- Change to blue
+            icon: const Icon(Icons.settings, color: Colors.blue),
+            label: const Text('User Settings', style: TextStyle(color: Colors.blue)),
           ),
         ],
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: CircleAvatar(
-            child: Text(username.isNotEmpty ? username[0].toUpperCase() : '?'),
+            child: Text(widget.username.isNotEmpty ? widget.username[0].toUpperCase() : '?'),
           ),
         ),
       ),
-      body: const Center(child: Text('No available surveys currently')),
+      body: _surveys.isEmpty
+          ? const Center(child: Text('No available surveys currently'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(24),
+              itemCount: _surveys.length,
+              itemBuilder: (context, index) {
+                final survey = _surveys[index];
+                return InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    final uri = Uri.parse(survey.link);
+                    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                      // Optionally show an error to the user
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not launch survey link')),
+                      );
+                    }
+                  },
+                  child: Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: ListTile(
+                      title: Text(survey.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('Client: ${survey.client}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.check_circle, color: Colors.green),
+                        onPressed: () => _removeSurvey(index),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -505,6 +585,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   }
 
   Future<void> _deleteAccount() async {
+    logToFile("Delete account triggered"); 
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_id');
     if (userId == null) return;
@@ -821,8 +902,38 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
     );
   }
 }
-void logToFile(String message) async {
-  final file = File('api_log.txt'); // This will be in your app's working directory
+Future<void> logToFile(String message) async {
+  final file = File('api_log.txt'); // This will be in your project root (next to README.md)
   final timestamp = DateTime.now().toIso8601String();
   await file.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
+}
+class Survey {
+  final String link;
+  final String name;
+  final String client;
+
+  Survey({required this.link, required this.name, required this.client});
+
+  Map<String, dynamic> toJson() => {
+    'link': link,
+    'name': name,
+    'client': client,
+  };
+
+  factory Survey.fromJson(Map<String, dynamic> json) => Survey(
+    link: json['link'] ?? '',
+    name: json['name'] ?? '',
+    client: json['client'] ?? '',
+  );
+}
+Future<void> saveSurveys(List<Survey> surveys) async {
+  final prefs = await SharedPreferences.getInstance();
+  final list = surveys.map((s) => jsonEncode(s.toJson())).toList();
+  await prefs.setStringList('surveys', list);
+}
+
+Future<List<Survey>> loadSurveys() async {
+  final prefs = await SharedPreferences.getInstance();
+  final list = prefs.getStringList('surveys') ?? [];
+  return list.map((s) => Survey.fromJson(jsonDecode(s))).toList();
 }

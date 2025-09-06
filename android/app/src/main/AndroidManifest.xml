@@ -3,7 +3,7 @@
     <!-- ✅ Permissions must be here, as children of <manifest> -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.INTERNET"/>
-
+    
     <application
         android:label="Survy"
         android:name="${applicationName}"
