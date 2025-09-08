@@ -1,3 +1,22 @@
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { checkAllClientsQualtrics } = require('./services/qualtricsService');
+const { db } = require('./services/firebaseAdmin..js');
+const FCMService = require('./services/fcmService');
+const path = require('path');
+const config = require('../src/config');
+const { CHECK_INTERVAL_MS } = config;
+
+exports.scheduledQualtricsCheck = onSchedule(
+	{
+		schedule: `every ${Math.ceil(CHECK_INTERVAL_MS / 60000)} minutes`,
+		timeZone: 'UTC'
+	},
+	async (event) => {
+		console.log('Running scheduled Qualtrics check for all clients...');
+		await checkAllClientsQualtrics(CHECK_INTERVAL_MS);
+		return null;
+	}
+);
 /**
  * Import function triggers from their respective submodules:
  *
@@ -10,14 +29,13 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const express = require("express");
 const bodyParser = require("body-parser");
-const mongoose = require("mongoose");
-const config = require("../src/config"); // Adjust path if needed
+
 
 // Import your routes
-const authRoutes = require("../src/routes/authRoutes");
-const notificationRoutes = require("../src/routes/notificationRoutes");
-const userRoutes = require("../src/routes/userRoutes");
-const clientRoutes = require("../src/routes/clientRoutes");
+const authRoutes = require("./routes/authRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const userRoutes = require("./routes/userRoutes");
+const clientRoutes = require("./routes/clientRoutes");
 
 const app = express();
 
@@ -30,15 +48,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/clients", clientRoutes);
 
-// Connect to MongoDB (only once per cold start)
-mongoose.connect(config.DB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => {
-  console.log('MongoDB connected');
-}).catch(err => {
-  console.error('MongoDB connection error:', err);
-});
+
 
 // Export the Express app as a Firebase Function
 exports.api = onRequest(app);

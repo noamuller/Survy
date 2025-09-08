@@ -4,9 +4,9 @@ const bcrypt = require('bcrypt');
 class ClientController {
   async signUp(req, res) {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required.' });
+      const { username, email, password } = req.body;
+      if (!username || !email || !password) {
+        return res.status(400).json({ message: 'Username, email and password are required.' });
       }
       const existingClientSnap = await db.collection('clients').where('email', '==', email).get();
       if (!existingClientSnap.empty) {
@@ -14,11 +14,12 @@ class ClientController {
       }
       const passwordHash = await bcrypt.hash(password, 10);
       const clientRef = await db.collection('clients').add({
+        username,
         email,
         passwordHash,
         createdAt: new Date(),
       });
-      return res.status(201).json({ message: 'Client registered successfully.', client: { id: clientRef.id, email } });
+      return res.status(201).json({ message: 'Client registered successfully.', client: { id: clientRef.id, username, email } });
     } catch (error) {
       console.error('Error in client signup:', error);
       return res.status(500).json({ message: 'Error signing up client.', error });
@@ -27,11 +28,11 @@ class ClientController {
 
   async signIn(req, res) {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required.' });
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required.' });
       }
-      const clientSnap = await db.collection('clients').where('email', '==', email).get();
+      const clientSnap = await db.collection('clients').where('username', '==', username).get();
       if (clientSnap.empty) {
         return res.status(401).json({ message: 'Invalid credentials.' });
       }

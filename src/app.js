@@ -1,11 +1,13 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const authRoutes = require('./routes/authRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
+const config = require('./config');
+const { CHECK_INTERVAL_MS } = config;
+
 const userRoutes = require('./routes/userRoutes');
 const { QualtricsService } = require('./services/qualtricsService');
 const path = require('path');
-const config = require('./config');
+const notificationRoutes = require('./routes/notificationRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const { db } = require('./services/firebaseAdmin..js');
 
@@ -34,8 +36,54 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// Endpoint to send a test notification to a user by email
 const FCMService = require('./services/fcmService');
+
+// Poll for new surveys and distributions for each client every CHECK_INTERVAL_MS
+setInterval(async () => {
+  try {
+    const clientsSnap = await db.collection('clients').get();
+    const clients = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    for (const client of clients) {
+      if (!client.qualtricsApiKey || !client.qualtricsDatacenter) continue;
+      const qualtricsService = new QualtricsService(client.qualtricsApiKey, client.qualtricsDatacenter);
+      // Poll surveys for this client
+      try {
+        const surveys = await qualtricsService.getSurveys();
+        console.log(`Surveys for client ${client.name}:`, surveys);
+        // For each survey, poll distributions
+        for (const survey of surveys) {
+          try {
+            const distributions = await qualtricsService.getDistributions(survey.id);
+            if (distributions && distributions.length > 0) {
+              const lastDistribution = distributions.reduce((latest, dist) => {
+                return new Date(dist.sendDate) > new Date(latest.sendDate) ? dist : latest;
+              }, distributions[0]);
+              console.log(`Last distribution for survey ${survey.id} (client ${client.name}):`, lastDistribution);
+            } else {
+              console.log(`No distributions found for survey ${survey.id} (client ${client.name})`);
+            }
+            // TODO: Process new distributions and send push notifications here
+          } catch (error) {
+            console.error(`Error polling distributions for survey ${survey.id} (client ${client.name}):`, error.message);
+          }
+        }
+      } catch (error) {
+        console.error(`Error polling surveys for client ${client.name}:`, error.message);
+      }
+      // Optionally update activeSurveys for the client
+      try {
+        await qualtricsService.updateClientActiveSurveys(client.id, CHECK_INTERVAL_MS);
+        console.log(`Updated activeSurveys for client: ${client.name}`);
+      } catch (err) {
+        console.error(`Error updating activeSurveys for client ${client.name}:`, err.message);
+      }
+    }
+    console.log('All clients processed at', new Date().toLocaleString());
+  } catch (err) {
+    console.error('Error fetching clients:', err);
+  }
+}, CHECK_INTERVAL_MS);
+
 app.post('/api/notifications/test', async (req, res) => {
   const { email, title, body } = req.body;
   if (!email) {

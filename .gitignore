@@ -70,3 +70,9 @@ node_modules/
 # dataconnect generated files
 .dataconnect
 
+# Ignore functions and public folders
+functions/
+public/
+!src/public/
+
+

@@ -155,16 +155,18 @@
       <div class="tabs">
         <button class="tab active" onclick="showTab('signup')">Client Sign Up</button>
         <button class="tab" onclick="showTab('login')">Client Login</button>
+        <button class="tab" onclick="showTab('notification')">Send Notification</button>
       </div>
       <form id="signupForm" class="active" onsubmit="return handleClientSignup(event)">
-        <input type="email" id="signupEmail" placeholder="Email" required>
-        <input type="password" id="signupPassword" placeholder="Password" required>
+  <input type="text" id="signupUsername" placeholder="Username" required>
+  <input type="email" id="signupEmail" placeholder="Email" required>
+  <input type="password" id="signupPassword" placeholder="Password" required>
         <button type="submit">Sign Up</button>
         <div class="message" id="signupMsg"></div>
       </form>
       <form id="loginForm" onsubmit="return handleClientLogin(event)">
-        <input type="email" id="loginEmail" placeholder="Email" required>
-        <input type="password" id="loginPassword" placeholder="Password" required>
+  <input type="text" id="loginUsername" placeholder="Username" required>
+  <input type="password" id="loginPassword" placeholder="Password" required>
         <button type="submit">Sign In</button>
         <div class="message" id="loginMsg"></div>
       </form>
@@ -174,6 +176,15 @@
         <input type="text" id="directoryId" placeholder="Directory ID" required>
         <button type="submit">Update Qualtrics Info</button>
         <div class="message" id="qualtricsMsg"></div>
+      </form>
+      <form id="notificationForm" class="hidden" onsubmit="return handleSendNotification(event)">
+        <select id="userEmailSelect" required>
+          <option value="">User Email</option>
+        </select>
+        <input type="text" id="notificationTitle" placeholder="Notification Title" value="Test Notification" required>
+        <input type="text" id="notificationBody" placeholder="Notification Body" value="This is a test notification." required>
+        <button type="submit">Send Notification</button>
+        <div class="message" id="notificationMsg"></div>
       </form>
       <button id="showHelpBtn" class="show-help-btn hidden" type="button" onclick="toggleHelp()">Show Help</button>
     </div>
@@ -209,18 +220,79 @@
 
     function showTab(tab) {
       document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('form').forEach(f => f.classList.remove('active'));
+      document.getElementById('signupForm').classList.remove('active');
+      document.getElementById('signupForm').classList.add('hidden');
+      document.getElementById('loginForm').classList.remove('active');
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('qualtricsForm').classList.remove('active');
       document.getElementById('qualtricsForm').classList.add('hidden');
+      document.getElementById('notificationForm').classList.remove('active');
+      document.getElementById('notificationForm').classList.add('hidden');
       document.getElementById('showHelpBtn').classList.add('hidden');
       document.getElementById('helpSection').classList.add('hidden');
       helpVisible = false;
       if (tab === 'signup') {
         document.querySelector('.tab:nth-child(1)').classList.add('active');
         document.getElementById('signupForm').classList.add('active');
-      } else {
+        document.getElementById('signupForm').classList.remove('hidden');
+      } else if (tab === 'login') {
         document.querySelector('.tab:nth-child(2)').classList.add('active');
         document.getElementById('loginForm').classList.add('active');
+        document.getElementById('loginForm').classList.remove('hidden');
+      } else if (tab === 'notification') {
+        document.querySelector('.tab:nth-child(3)').classList.add('active');
+        document.getElementById('notificationForm').classList.add('active');
+        document.getElementById('notificationForm').classList.remove('hidden');
+        loadUserEmails();
       }
+    }
+    async function loadUserEmails() {
+      const select = document.getElementById('userEmailSelect');
+      select.innerHTML = '<option value="">User Email</option>';
+      try {
+        const res = await fetch('/api/users');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach(user => {
+            if (user.email) {
+              const opt = document.createElement('option');
+              opt.value = user.email;
+              opt.textContent = user.email;
+              select.appendChild(opt);
+            }
+          });
+        }
+      } catch (err) {
+        // Optionally show error
+      }
+    }
+
+    async function handleSendNotification(e) {
+      e.preventDefault();
+      const email = document.getElementById('userEmailSelect').value;
+      const title = document.getElementById('notificationTitle').value;
+      const body = document.getElementById('notificationBody').value;
+      const msg = document.getElementById('notificationMsg');
+      msg.textContent = '';
+      if (!email) {
+        msg.style.color = '#e74c3c';
+        msg.textContent = 'Please select a user email.';
+        return false;
+      }
+      try {
+        const res = await fetch('/api/notifications/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, title, body })
+        });
+        const data = await res.json();
+        msg.style.color = res.ok ? '#27ae60' : '#e74c3c';
+        msg.textContent = data.message || (res.ok ? 'Notification sent!' : 'Failed to send notification.');
+      } catch (err) {
+        msg.style.color = '#e74c3c';
+        msg.textContent = 'Error sending notification.';
+      }
+      return false;
     }
 
     async function handleClientSignup(e) {

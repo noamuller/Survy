@@ -1,0 +1,55 @@
+User API Documentation
+======================
+
+Create User
+-----------
+POST /users
+Body:
+{
+  "username": "string",         // required
+  "fcmToken": "string",         // required
+  "emails": ["email1", "email2"] // required, array of emails
+}
+Response:
+- 201 Created with user object
+- 400 Bad Request if missing fields
+- 409 Conflict if username exists
+
+Get User
+--------
+GET /users/:id
+Response:
+- 200 OK with user object
+- 404 Not Found if user does not exist
+
+Add Email to User
+-----------------
+POST /users/:id/emails
+Body:
+{
+  "email": "string" // required
+}
+Response:
+- 200 OK with updated emails array
+- 400 Bad Request if missing email
+- 404 Not Found if user does not exist
+- 409 Conflict if email already exists for user
+
+Remove Email from User
+---------------------
+DELETE /users/:id/emails
+Body:
+{
+  "email": "string" // required
+}
+Response:
+- 200 OK with updated emails array
+- 400 Bad Request if missing email
+- 404 Not Found if user does not exist
+
+Delete User
+-----------
+DELETE /users/:id
+Response:
+- 200 OK on success
+- 404 Not Found if user does not exist

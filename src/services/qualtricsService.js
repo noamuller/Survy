@@ -9,10 +9,10 @@ async function getFcmTokensForMailingList(contacts) {
   console.log('getFcmTokensForMailingList: emails from contacts:', emails);
   if (emails.length === 0) return [];
 
-  // Find users whose email is in the mailing list
+  // Find users whose emails array contains any of the mailing list emails
   let foundUsers = [];
   if (emails.length > 0) {
-    const usersSnap = await db.collection('users').where('email', 'in', emails).get();
+    const usersSnap = await db.collection('users').where('emails', 'array-contains-any', emails).get();
     foundUsers = usersSnap.docs.map(doc => doc.data());
     console.log('getFcmTokensForMailingList: found users:', foundUsers);
   }
@@ -26,6 +26,28 @@ async function getFcmTokensForMailingList(contacts) {
 }
 
 class QualtricsService {
+  // Get individual distribution links for a distribution
+  async getDistributionLinks(distributionId, surveyId, pageSize = 100, skipToken = null) {
+    if (!distributionId || !surveyId) {
+      throw new Error('distributionId and surveyId are required');
+    }
+    let url = `/distributions/${distributionId}/links?surveyId=${surveyId}&pageSize=${pageSize}`;
+    if (skipToken) {
+      url += `&skipToken=${encodeURIComponent(skipToken)}`;
+    }
+    try {
+      const response = await this.api.get(url);
+      // The links are in response.data.result.elements
+      return {
+        links: response.data.result.elements,
+        nextPage: response.data.result.nextPage || null,
+        meta: response.data.meta
+      };
+    } catch (error) {
+      console.error('Error fetching distribution links:', error.response ? JSON.stringify(error.response.data) : error.message);
+      throw error;
+    }
+  }
   constructor(apiKey, dataCenter) {
     this.apiKey = apiKey;
     this.dataCenter = dataCenter;
@@ -79,7 +101,7 @@ class QualtricsService {
   }
 
   // New method: Update client's activeSurveys with last distribution times
-  async updateClientActiveSurveys(clientId) {
+  async updateClientActiveSurveys(clientId, checkIntervalMs = 5 * 60 * 1000) {
     console.log('DEBUG: Entered updateClientActiveSurveys for clientId:', clientId);
     if (!clientId) {
       console.error('ERROR: updateClientActiveSurveys called with invalid clientId:', clientId);
@@ -164,27 +186,55 @@ class QualtricsService {
           } else {
             console.log('DEBUG: Mailing list contacts:', mailingList.contacts);
             console.log('DEBUG: About to call getFcmTokensForMailingList. mailingList.contacts:', mailingList.contacts);
-            let fcmTokensRaw = [];
+            let emailTokenPairs = [];
             try {
-              fcmTokensRaw = await getFcmTokensForMailingList(mailingList.contacts);
-              console.log('DEBUG: Raw FCM tokens returned:', fcmTokensRaw);
+              // Get users with emails and their tokens
+              const usersSnap = await db.collection('users').where('emails', 'array-contains-any', mailingList.contacts.map(c => c.email)).get();
+              const users = usersSnap.docs.map(doc => doc.data());
+              for (const user of users) {
+                if (Array.isArray(user.emails) && typeof user.fcmToken === 'string' && user.fcmToken.length > 0) {
+                  for (const email of user.emails) {
+                    if (mailingList.contacts.some(c => c.email === email)) {
+                      emailTokenPairs.push({ email, token: user.fcmToken });
+                    }
+                  }
+                }
+              }
+              console.log('DEBUG: emailTokenPairs:', emailTokenPairs);
             } catch (fcmErr) {
-              console.error('DEBUG: Error in getFcmTokensForMailingList:', fcmErr.message);
+              console.error('DEBUG: Error building emailTokenPairs:', fcmErr.message);
             }
-            // Only use valid, non-empty string tokens
-            const fcmTokens = fcmTokensRaw.filter(t => typeof t === 'string' && t.length > 0);
-            console.log(`DEBUG: Matched FCM tokens for distribution ${lastDistribution.id}:`, fcmTokens);
             // Step 7: Send push notifications
-            for (const token of fcmTokens) {
+            for (const { email, token } of emailTokenPairs) {
               const notificationTitle = 'New Survey Distribution';
               const notificationBody = `A new survey "${survey.name}" is available!`;
+              let surveyLink = null;
+              // Find the individual link for this email
+              if (lastDistribution && lastDistribution.id && survey.id) {
+                try {
+                  const linksResult = await this.getDistributionLinks(lastDistribution.id, survey.id);
+                  console.log('DEBUG: linksResult.links:', linksResult.links);
+                  const linkObj = linksResult.links.find(l => l.email === email || l.recipientEmail === email);
+                  if (linkObj && linkObj.link) {
+                    surveyLink = linkObj.link;
+                    console.log('DEBUG: Found survey link for email:', email, surveyLink);
+                  } else {
+                    console.log('DEBUG: No survey link found for email:', email);
+                  }
+                } catch (err) {
+                  console.error('Error fetching individual survey link:', err.message);
+                }
+              }
               console.log(`DEBUG: About to send push notification to token: ${token}`);
-              console.log('DEBUG: Notification payload:', { token, notificationTitle, notificationBody });
+              console.log('DEBUG: Notification payload:', { token, notificationTitle, notificationBody, surveyLink });
               try {
                 await FCMService.sendPushNotification(
                   token,
                   notificationTitle,
-                  notificationBody
+                  notificationBody,
+                  surveyLink,
+                  survey.name,
+                  client.username || client.email || client.id
                 );
                 console.log(`DEBUG: Push sent to token: ${token}`);
               } catch (pushErr) {
